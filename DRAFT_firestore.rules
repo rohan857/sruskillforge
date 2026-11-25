@@ -1,0 +1,185 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 1: Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Hardened Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Validation Blueprint: UserProfile
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+        'uid',
+        'name',
+        'handle',
+        'selectedCompany',
+        'targetRole',
+        'eloRating',
+        'globalReadinessScore',
+        'xp',
+        'dossierHash',
+        'completedModuleIds',
+        'passedQuizIds',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'uid',
+        'name',
+        'handle',
+        'selectedCompany',
+        'targetRole',
+        'eloRating',
+        'globalReadinessScore',
+        'xp',
+        'dossierHash',
+        'completedModuleIds',
+        'passedQuizIds',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.uid == request.auth.uid &&
+      data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+      data.handle is string && data.handle.size() >= 1 && data.handle.size() <= 60 &&
+      data.selectedCompany is string && (data.selectedCompany == 'JANKEN CORPS' || data.selectedCompany == 'HOTBURN STUDIOS') &&
+      data.targetRole is string && data.targetRole.size() >= 2 && data.targetRole.size() <= 120 &&
+      data.eloRating is int && data.eloRating >= 0 && data.eloRating <= 5000 &&
+      data.globalReadinessScore is int && data.globalReadinessScore >= 0 && data.globalReadinessScore <= 100 &&
+      data.xp is int && data.xp >= 0 && data.xp <= 1000000 &&
+      data.dossierHash is string && data.dossierHash.size() >= 4 && data.dossierHash.size() <= 64 &&
+      data.completedModuleIds is string && data.completedModuleIds.size() <= 2000 &&
+      data.passedQuizIds is string && data.passedQuizIds.size() <= 2000 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: UserPrivateInfo (PII Split Collection)
+    function isValidUserPrivateInfo(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.uid == request.auth.uid &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.createdAt is timestamp;
+    }
+
+    // Validation Blueprint: EmailInquiry
+    function isValidEmailInquiry(data) {
+      return data.keys().hasAll([
+        'uid',
+        'company',
+        'recipientEmail',
+        'senderName',
+        'senderEmail',
+        'topic',
+        'message',
+        'dossierHash',
+        'status',
+        'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'uid',
+        'company',
+        'recipientEmail',
+        'senderName',
+        'senderEmail',
+        'topic',
+        'message',
+        'dossierHash',
+        'status',
+        'createdAt'
+      ]) &&
+      data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.uid == request.auth.uid &&
+      data.company is string && (data.company == 'JANKEN CORPS' || data.company == 'HOTBURN STUDIOS') &&
+      data.recipientEmail is string && data.recipientEmail == 'hotburnstudios@gmail.com' &&
+      data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 100 &&
+      data.senderEmail is string && data.senderEmail.size() >= 3 && data.senderEmail.size() <= 254 &&
+      data.topic is string && data.topic.size() >= 2 && data.topic.size() <= 200 &&
+      data.message is string && data.message.size() >= 2 && data.message.size() <= 4000 &&
+      data.dossierHash is string && data.dossierHash.size() >= 2 && data.dossierHash.size() <= 64 &&
+      data.status is string && data.status == 'SENT_TO_HOTBURNSTUDIOS_GMAIL' &&
+      data.createdAt is timestamp;
+    }
+
+    // Collection 1: /users/{userId}
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name',
+          'handle',
+          'selectedCompany',
+          'targetRole',
+          'eloRating',
+          'globalReadinessScore',
+          'xp',
+          'dossierHash',
+          'completedModuleIds',
+          'passedQuizIds',
+          'updatedAt'
+        ]);
+      allow delete: if false;
+
+      // Subcollection: /users/{userId}/private/{docId} (PII Isolation)
+      match /private/{docId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(docId) &&
+          exists(/databases/$(database)/documents/users/$(userId));
+        allow list: if false;
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(docId) &&
+          docId == 'info' &&
+          isValidUserPrivateInfo(incoming()) &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/users/$(userId));
+        allow update, delete: if false;
+      }
+    }
+
+    // Collection 2: /inquiries/{inquiryId}
+    match /inquiries/{inquiryId} {
+      allow get: if isSignedIn() && isValidId(inquiryId) && existing().uid == request.auth.uid;
+      allow list: if isSignedIn() && existing().uid == request.auth.uid;
+      allow create: if isSignedIn() &&
+        isValidId(inquiryId) &&
+        isValidEmailInquiry(incoming()) &&
+        incoming().createdAt == request.time &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      allow update, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "JANKEN CORPS — Career Operating System & Proctored OA Arena",
+  "description": "Enterprise-grade Career Operating System, Proof-of-Work Professional Network, Course & System Kit Academy, Proctored Coding & OA Arena, AI Mock Interview Studio, and Direct-Hiring Job Portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

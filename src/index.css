@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #f4f1ea;
+    color: #0c0d0f;
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.bg-drafting-grid {
+  background-color: #f4f1ea;
+  background-image: 
+    linear-gradient(to right, rgba(20, 20, 20, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(20, 20, 20, 0.045) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
